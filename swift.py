@@ -86,6 +86,21 @@ class StringMatchExpectation(ExpectationBase):
 
         return Segment.notFound(segment.end)
 
+class OneOfStringsMatchExpectation(ExpectationBase):
+
+    def __init__(self, matches):
+        self.matches = matches
+
+    def scan(self, str, segment):
+        for i in range(segment.start, segment.end):
+            for word in self.matches:
+                word_len = len(word)
+                if i + word_len <= len(str):
+                    if str[i : i + word_len] == word:
+                        return Segment(i, i + word_len)
+
+        return Segment.notFound(segment.end)
+
 class ConditionExpectationBase(ExpectationBase):
 
     def canEmpty(self):
@@ -247,7 +262,7 @@ def construct_suggestions_swift(str):
     start_time = time.time()
     funcs = scan_text(str, func_rules)
     print("Parse time func = ", time.time() - start_time)
-    print(len(funcs))
+    # print(funcs)
 
     for func in funcs:
         results.append((func[0], func[1]))
@@ -272,18 +287,16 @@ def construct_suggestions_swift(str):
         StringMatchExpectation("{"),
         BackwardExpectation(1),
         MatchBracketExpectation("{", "}").save().transform([
-            StringMatchExpectation("let").loop(),
+            OneOfStringsMatchExpectation(["let", "var"]).loop(),
             SpacesExpectation(),
             WordExpectation().save()
         ]),
     ]
 
-    # print(scan_text(str, struct_inits_rules))
-
     start_time = time.time()
     class_inits = scan_text(str, class_inits_rules)
     print("Parse time class = ", time.time() - start_time)
-    print(len(class_inits))
+    # print(class_inits)
     for class_init in class_inits:
             results.append((class_init[0], class_init[1]))
 
@@ -299,6 +312,7 @@ def construct_suggestions_swift(str):
     start_time = time.time()
     structs = scan_text(str, struct_inits_rules)
     print("Parse time = ", time.time() - start_time)
+    # print(structs)
     for struct in structs:
         func_name = struct[0]
         params = struct[1]
@@ -403,6 +417,7 @@ def indentation_heuristic(content):
 
 class ViewDeactivatedListener(sublime_plugin.EventListener):
     def on_deactivated(self, view):
+        print("==============================")
         global suggestions
         start_time = time.time()
         str = view.substr(sublime.Region(0, view.size()))
