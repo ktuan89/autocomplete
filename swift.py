@@ -368,10 +368,47 @@ def swift_autocompletion(view, prefix, locations):
 
     return results
 
+def indentation_heuristic(content):
+    indentation = 4
+    num_indentation = 1
+
+    arr = content.split("\n")
+    stack = []
+    results = []
+    regex = re.compile("\\b((func\\s+[A-Za-z]+)|(init))\\(.*\\{")
+
+    for s in arr:
+        strips = s.strip()
+        if strips.startswith("//") or strips == "":
+            # ignore comments
+            continue
+        else:
+            cp = 0
+            while cp < len(s) and s[cp] == " ":
+                cp = cp + 1
+            # print(cp)
+            while len(stack) > 0 and cp == stack[len(stack) - 1] and strips == "}":
+                #print("pop " + str(stack[len(stack) - 1]))
+                stack.pop()
+            if len(stack) > 0 and cp >= stack[len(stack) - 1] + num_indentation * indentation:
+                #print("Ignore " + s)
+                continue
+            else:
+                results.append(s)
+                if regex.search(s) is not None:
+                    # print("append " + str(cp) + " " + s)
+                    stack.append(cp)
+    print(str(len(arr)) + " " + str(len(results)))
+    return "\n".join(results)
+
 class ViewDeactivatedListener(sublime_plugin.EventListener):
     def on_deactivated(self, view):
         global suggestions
         start_time = time.time()
         str = view.substr(sublime.Region(0, view.size()))
+        if len(str) >= 200000:
+            t = time.time()
+            str = indentation_heuristic(str)
+            print("Heuristic time = ", time.time() - t)
         suggestions[view.id()] = construct_suggestions_swift(str)
         print("Parse time = ", time.time() - start_time)
