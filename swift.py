@@ -101,6 +101,22 @@ class OneOfStringsMatchExpectation(ExpectationBase):
 
         return Segment.notFound(segment.end)
 
+class OneOfStringsMatchAtBeginningExpectation(ExpectationBase):
+
+    def __init__(self, matches):
+        self.matches = matches
+
+    def scan(self, str, segment):
+        for i in range(segment.start, segment.end):
+            for word in self.matches:
+                word_len = len(word)
+                if i + word_len <= len(str):
+                    if str[i : i + word_len] == word:
+                        return Segment(i, i + word_len)
+            break
+
+        return Segment.notFound(segment.start)
+
 class ConditionExpectationBase(ExpectationBase):
 
     def canEmpty(self):
@@ -127,6 +143,12 @@ class WordExpectation(ConditionExpectationBase):
         return c.isalnum() or c == "_"
 
 class SpacesExpectation(ConditionExpectationBase):
+    def condition(self, c):
+        return c == " " or c == "\t" or c == "\n"
+
+class AtLeastOneSpacesExpectation(ConditionExpectationBase):
+    def canEmpty(self):
+        return False
     def condition(self, c):
         return c == " " or c == "\t" or c == "\n"
 
@@ -163,10 +185,24 @@ class MatchBracketExpectation(ExpectationBase):
             i = i + 1
         return Segment.notFound(i)
 
+class CapitalizedWordExpectation(ExpectationBase):
+    def scan(self, str, segment):
+        start = segment.start
+        i = start
+        while i < len(str):
+            condition = (i == start and str[i].isupper()) or (i > start and (str[i].isalnum() or str[i] == "_"))
+            if not condition:
+                break
+            i = i + 1
+        if i == start:
+            return Segment.notFound(start)
+        return Segment(start, i)
+
 def scan_text_recursive(str, segment, expectations, results, current_matches):
     if len(expectations) == 0:
         results.append(current_matches)
         return segment.start
+    # print("recursive: ", segment.start, " ", segment.end, " ", expectations[0])
 
     start = segment.start
     end = segment.end
@@ -178,7 +214,6 @@ def scan_text_recursive(str, segment, expectations, results, current_matches):
         res = expectation.scan(str, Segment(start, end))
         if res.invalid():
             if is_looping:
-                # print(start, " ", end, " ", res.end)
                 start = res.end
             else:
                 return res.end
@@ -330,8 +365,32 @@ def construct_suggestions_swift(str):
                     is_first = False
             # snippet = snippet + ")"
             suggestions.append((func_name, snippet))
-
     return suggestions
+
+def construct_links(str):
+    class_funcs_rules = [
+        OneOfStringsMatchExpectation(["class", "protocol"]).loop(),
+        SpacesExpectation(),
+        WordExpectation().save(),
+        StringMatchExpectation("{"),
+        BackwardExpectation(1),
+        MatchBracketExpectation("{", "}").nested(),
+        OneOfStringsMatchExpectation(["func", "var", "let"]).loop(),
+        AtLeastOneSpacesExpectation(),
+        WordExpectation().save()
+    ]
+    links = scan_text(str, class_funcs_rules)
+    class_to_func = {}
+    for link in links:
+        if len(link) == 2:
+            if link[0] in class_to_func:
+                class_to_func[link[0]].append(link[1])
+            else:
+                class_to_func[link[0]] = [link[1]]
+
+    #print(links)
+    #print(class_to_func)
+    return class_to_func
 
 def filter_suggestion_for_prefix(suggestions, prefix):
     results = []
@@ -364,6 +423,7 @@ class InsertBracketCommand(sublime_plugin.TextCommand):
             self.view.sel().add(sublime.Region(cursor, cursor))
 
 suggestions = {}
+links = {}
 
 def swift_autocompletion(view, prefix, locations):
     results = []
@@ -378,9 +438,66 @@ def swift_autocompletion(view, prefix, locations):
 
     if len(results) == 0:
         view.run_command("insert_bracket")
-        return [("#", " ")]
-
+        return results
+    print(results)
     return results
+
+previous_guess = {}
+
+def try_to_guess_type(variable, str):
+    global previous_guess
+    type_rule = [
+        StringMatchExpectation(variable).loop(),
+        SpacesExpectation(),
+        OneOfStringsMatchAtBeginningExpectation(["=", ":"]),
+        SpacesExpectation(),
+        CapitalizedWordExpectation().save()
+    ]
+
+    types = scan_text(str, type_rule)
+    print(types)
+    """s = set()
+    for type in types:
+        s.add(type[0])
+    if len(s) == 1:"""
+    if len(types) > 0:
+        type = types[len(types) - 1][0]
+        previous_guess[variable] = type
+        return type
+    if variable in previous_guess:
+        return previous_guess[variable]
+    return None
+
+def grab_lines(view, position):
+    results = []
+    position = view.line(position).begin() - 1
+    while position >= 0 and len(results) <= 30:
+        line = view.line(position)
+        line_str = view.substr(line)
+        if not line_str.strip().startswith("//"):
+            results.append(line_str)
+        position = line.begin() - 1
+    return "\n".join(results[::-1])
+
+def swift_autocompletion_call(view, prefix, locations):
+    results = []
+
+    word_range = view.word(locations[0] - 2)
+    word = view.substr(word_range)
+
+    str = grab_lines(view, word_range.begin())
+
+    word_type = try_to_guess_type(word, str)
+
+    if word_type is not None:
+        print("Guess type = ", word_type)
+        for view_id, class_to_func in links.items():
+            if word_type in class_to_func:
+                funcs = class_to_func[word_type]
+                for func in funcs:
+                    results.append((func + "\t" + "+", func))
+
+    return filter_duplicate(results)
 
 def indentation_heuristic(content):
     indentation = 4
@@ -419,11 +536,14 @@ class ViewDeactivatedListener(sublime_plugin.EventListener):
     def on_deactivated(self, view):
         print("==============================")
         global suggestions
+        global links
         start_time = time.time()
         str = view.substr(sublime.Region(0, view.size()))
         if len(str) >= 200000:
             t = time.time()
             str = indentation_heuristic(str)
             print("Heuristic time = ", time.time() - t)
+        else:
+            links[view.id()] = construct_links(str)
         suggestions[view.id()] = construct_suggestions_swift(str)
         print("Parse time = ", time.time() - start_time)
