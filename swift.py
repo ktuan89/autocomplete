@@ -265,16 +265,22 @@ def sublime_params_snippet_from_str(params_str, is_func):
                 fill_str = fill_str + ", "
 
             param_name = None
+            param_var = None
             if match is not None and len(match.groups()) == 2:
-                param_name = match.group(2)
+                param_var = match.group(2)
+                if match.group(1) is not None:
+                    param_name = match.group(1).strip()
+                else:
+                    param_name = match.group(2)
 
-            if param_name is None:
+
+            if param_name is None or param_var is None:
                 fill_str = fill_str + "${0}".format(current_index)
             else:
                 if is_first and is_func:
-                    fill_str = fill_str + "${{{0}:{1}}}".format(current_index, param_name)
+                    fill_str = fill_str + "${{{0}:{1}}}".format(current_index, param_var)
                 else:
-                    fill_str = fill_str + "{1}: ${{{0}}}".format(current_index, param_name)
+                    fill_str = fill_str + "{1}: ${{{0}:{2}}}".format(current_index, param_name, param_var)
 
             if is_first:
                 is_first = False
@@ -456,10 +462,6 @@ def try_to_guess_type(variable, str):
 
     types = scan_text(str, type_rule)
     print(types)
-    """s = set()
-    for type in types:
-        s.add(type[0])
-    if len(s) == 1:"""
     if len(types) > 0:
         type = types[len(types) - 1][0]
         previous_guess[variable] = type
