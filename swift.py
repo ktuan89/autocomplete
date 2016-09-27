@@ -8,6 +8,8 @@ from os import listdir
 from os.path import isfile, join, expanduser
 import codecs
 
+import pickle
+
 class Segment:
     def __init__(self, start, end):
         self.start = start
@@ -548,15 +550,34 @@ def preload_autocomplete():
     folder = swiftPreloadFolder()
     if folder is not None:
         folder = expanduser(folder)
-        onlyfiles = [f for f in listdir(folder) if isfile(join(folder, f))]
+        onlyfiles = [f for f in listdir(folder) if isfile(join(folder, f)) and re.match(r'[a-z_A-Z0-9]+(\.[a-z_A-Z0-9]+)*', f)]
+        cached_files = set([f for f in onlyfiles if f.endswith(".cached")])
+        onlyfiles = [f for f in onlyfiles if not f.endswith(".cached")]
         current_id = 123456
         start_time = time.time()
         for file in onlyfiles:
-            actual_path = join(folder, file)
-            with codecs.open(actual_path, 'r', encoding='utf-8') as f:
-                content = f.read()
-                suggestions[current_id] = construct_suggestions_swift(content)
+            cached_file = file + ".cached"
+            if cached_file in cached_files:
+                actual_path = join(folder, cached_file)
+                thefile = open(actual_path, 'rb')
+                this_suggestions = pickle.load(thefile)
+                thefile.close()
+                suggestions[current_id] = this_suggestions
                 current_id = current_id + 1
+            else:
+                actual_path = join(folder, file)
+                with codecs.open(actual_path, 'r', encoding='utf-8') as f:
+                    content = f.read()
+                    this_suggestions = construct_suggestions_swift(content)
+
+                    cached_path = join(folder, cached_file)
+                    thefile = open(cached_path, 'wb')
+                    pickle.dump(this_suggestions, thefile)
+                    thefile.close()
+
+                    suggestions[current_id] = this_suggestions
+                    current_id = current_id + 1
+
         print("Init time = ", time.time() - start_time)
     pass
 
