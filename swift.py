@@ -192,19 +192,27 @@ class InsertBracketCommand(sublime_plugin.TextCommand):
             self.view.sel().clear()
             self.view.sel().add(sublime.Region(cursor, cursor))
 
+METHOD_KEY = 'method'
+PARAM_KEY = 'param'
+
 suggestions = {}
-links = {}
 
 def swift_autocompletion(view, prefix, locations):
     results = []
 
     word_range = view.word(locations[0] - 2)
     word = view.substr(word_range)
-
+    print("autocompletion ", word)
+    global suggestions
+    print(suggestions)
     for view_id, suggestions_per_view in suggestions.items():
-        results += filter_suggestion_for_prefix(suggestions_per_view, word)
+        if PARAM_KEY in suggestions_per_view:
+            print(suggestions_per_view[PARAM_KEY])
+            results += filter_suggestion_for_prefix(suggestions_per_view[PARAM_KEY], word)
 
     results = filter_duplicate(results)
+
+    print(results)
 
     if len(results) == 0:
         view.run_command("insert_bracket")
@@ -246,6 +254,7 @@ def grab_lines(view, position):
     return "\n".join(results[::-1])
 
 def swift_autocompletion_call(view, prefix, locations):
+    global suggestions
     results = []
 
     word_range = view.word(locations[0] - 2)
@@ -257,13 +266,27 @@ def swift_autocompletion_call(view, prefix, locations):
 
     if word_type is not None:
         print("Guess type = ", word_type)
-        for view_id, class_to_func in links.items():
-            if word_type in class_to_func:
-                funcs = class_to_func[word_type]
-                for func in funcs:
-                    results.append((func + "\t" + "+", func))
-
+        print("suggestions = ", suggestions)
+        for view_id, suggestions_per_view in suggestions.items():
+            if METHOD_KEY in suggestions_per_view:
+                method_suggestions = suggestions_per_view[METHOD_KEY]
+                if word_type in method_suggestions:
+                    funcs = method_suggestions[word_type]
+                    for func in funcs:
+                        results.append((func + "\t" + "+", func))
+    # print("suggestions 2222 = ", suggestions)
     return filter_duplicate(results)
+
+def comment_and_empty_line_remove(content):
+    arr = content.split("\n")
+    results = []
+    for s in arr:
+        strips = s.strip()
+        if strips.startswith("//") or strips == "":
+            pass
+        else:
+            results.append(s)
+    return "\n".join(results)
 
 def indentation_heuristic(content):
     indentation = 4
@@ -276,25 +299,21 @@ def indentation_heuristic(content):
 
     for s in arr:
         strips = s.strip()
-        if strips.startswith("//") or strips == "":
-            # ignore comments
+        cp = 0
+        while cp < len(s) and s[cp] == " ":
+            cp = cp + 1
+        # print(cp)
+        while len(stack) > 0 and cp == stack[len(stack) - 1] and strips == "}":
+            #print("pop " + str(stack[len(stack) - 1]))
+            stack.pop()
+        if len(stack) > 0 and cp >= stack[len(stack) - 1] + num_indentation * indentation:
+            #print("Ignore " + s)
             continue
         else:
-            cp = 0
-            while cp < len(s) and s[cp] == " ":
-                cp = cp + 1
-            # print(cp)
-            while len(stack) > 0 and cp == stack[len(stack) - 1] and strips == "}":
-                #print("pop " + str(stack[len(stack) - 1]))
-                stack.pop()
-            if len(stack) > 0 and cp >= stack[len(stack) - 1] + num_indentation * indentation:
-                #print("Ignore " + s)
-                continue
-            else:
-                results.append(s)
-                if regex.search(s) is not None:
-                    # print("append " + str(cp) + " " + s)
-                    stack.append(cp)
+            results.append(s)
+            if regex.search(s) is not None:
+                # print("append " + str(cp) + " " + s)
+                stack.append(cp)
     print(str(len(arr)) + " " + str(len(results)))
     return "\n".join(results)
 
@@ -305,7 +324,10 @@ def swiftPreloadFolder():
     return autocompleteSettings().get('preload_swift')
 
 def preload_autocomplete():
+    global suggestions
+    print("Preload~~~~~~~~~~~~~")
     folder = swiftPreloadFolder()
+    print(folder)
     if folder is not None:
         folder = expanduser(folder)
         onlyfiles = [f for f in listdir(folder) if isfile(join(folder, f)) and re.match(r'[a-z_A-Z0-9]+(\.[a-z_A-Z0-9]+)*', f)]
@@ -313,6 +335,7 @@ def preload_autocomplete():
         onlyfiles = [f for f in onlyfiles if not f.endswith(".cached")]
         current_id = 123456
         start_time = time.time()
+        print(onlyfiles)
         for file in onlyfiles:
             cached_file = file + ".cached"
             if cached_file in cached_files:
@@ -326,7 +349,11 @@ def preload_autocomplete():
                 actual_path = join(folder, file)
                 with codecs.open(actual_path, 'r', encoding='utf-8') as f:
                     content = f.read()
-                    this_suggestions = construct_suggestions_swift(content)
+                    content = comment_and_empty_line_remove(content)
+                    this_suggestions = {
+                        PARAM_KEY: construct_suggestions_swift(content),
+                        METHOD_KEY: construct_links(content)
+                    }
 
                     cached_path = join(folder, cached_file)
                     thefile = open(cached_path, 'wb')
@@ -339,20 +366,25 @@ def preload_autocomplete():
         print("Init time = ", time.time() - start_time)
     pass
 
-preload_autocomplete()
+# sublime.set_timeout(lambda: preload_autocomplete(), 500)
 
 class ViewDeactivatedListener(sublime_plugin.EventListener):
     def on_deactivated(self, view):
         print("==============================")
         global suggestions
-        global links
         start_time = time.time()
         str = view.substr(sublime.Region(0, view.size()))
+        str = comment_and_empty_line_remove(str)
+        method_suggestions = None
         if len(str) >= 200000:
             t = time.time()
             str = indentation_heuristic(str)
             print("Heuristic time = ", time.time() - t)
         else:
-            links[view.id()] = construct_links(str)
-        suggestions[view.id()] = construct_suggestions_swift(str)
+            method_suggestions = construct_links(str)
+        print(suggestions, " ", view.id())
+        suggestions[view.id()] = { PARAM_KEY: construct_suggestions_swift(str) }
+        if method_suggestions is not None:
+            suggestions[view.id()][METHOD_KEY] = method_suggestions
+        # print(suggestions[view.id()])
         print("Parse time = ", time.time() - start_time)
