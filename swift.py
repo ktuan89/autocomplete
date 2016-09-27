@@ -4,6 +4,10 @@ import re
 import threading
 import time
 
+from os import listdir
+from os.path import isfile, join, expanduser
+import codecs
+
 class Segment:
     def __init__(self, start, end):
         self.start = start
@@ -533,6 +537,30 @@ def indentation_heuristic(content):
                     stack.append(cp)
     print(str(len(arr)) + " " + str(len(results)))
     return "\n".join(results)
+
+def autocompleteSettings():
+    return sublime.load_settings('autocomplete.sublime-settings')
+
+def swiftPreloadFolder():
+    return autocompleteSettings().get('preload_swift')
+
+def preload_autocomplete():
+    folder = swiftPreloadFolder()
+    if folder is not None:
+        folder = expanduser(folder)
+        onlyfiles = [f for f in listdir(folder) if isfile(join(folder, f))]
+        current_id = 123456
+        start_time = time.time()
+        for file in onlyfiles:
+            actual_path = join(folder, file)
+            with codecs.open(actual_path, 'r', encoding='utf-8') as f:
+                content = f.read()
+                suggestions[current_id] = construct_suggestions_swift(content)
+                current_id = current_id + 1
+        print("Init time = ", time.time() - start_time)
+    pass
+
+preload_autocomplete()
 
 class ViewDeactivatedListener(sublime_plugin.EventListener):
     def on_deactivated(self, view):
