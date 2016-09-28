@@ -1,6 +1,7 @@
 import sublime, sublime_plugin
 
 from .text_processing import *
+from .utilities import *
 
 import re
 import threading
@@ -202,17 +203,16 @@ def swift_autocompletion(view, prefix, locations):
 
     word_range = view.word(locations[0] - 2)
     word = view.substr(word_range)
-    print("autocompletion ", word)
+    #print("autocompletion ", word)
     global suggestions
-    print(suggestions)
+    #print(suggestions)
     for view_id, suggestions_per_view in suggestions.items():
         if PARAM_KEY in suggestions_per_view:
-            print(suggestions_per_view[PARAM_KEY])
             results += filter_suggestion_for_prefix(suggestions_per_view[PARAM_KEY], word)
 
     results = filter_duplicate(results)
 
-    print(results)
+    #print(results)
 
     if len(results) == 0:
         view.run_command("insert_bracket")
@@ -265,8 +265,8 @@ def swift_autocompletion_call(view, prefix, locations):
     word_type = try_to_guess_type(word, str)
 
     if word_type is not None:
-        print("Guess type = ", word_type)
-        print("suggestions = ", suggestions)
+        #print("Guess type = ", word_type)
+        #print("suggestions = ", suggestions)
         for view_id, suggestions_per_view in suggestions.items():
             if METHOD_KEY in suggestions_per_view:
                 method_suggestions = suggestions_per_view[METHOD_KEY]
@@ -274,7 +274,6 @@ def swift_autocompletion_call(view, prefix, locations):
                     funcs = method_suggestions[word_type]
                     for func in funcs:
                         results.append((func + "\t" + "+", func))
-    # print("suggestions 2222 = ", suggestions)
     return filter_duplicate(results)
 
 def comment_and_empty_line_remove(content):
@@ -317,16 +316,8 @@ def indentation_heuristic(content):
     print(str(len(arr)) + " " + str(len(results)))
     return "\n".join(results)
 
-def autocompleteSettings():
-    return sublime.load_settings('autocomplete.sublime-settings')
-
-def swiftPreloadFolder():
-    return autocompleteSettings().get('preload_swift')
-
-def preload_autocomplete():
+def preload_autocomplete(folder):
     global suggestions
-    print("Preload~~~~~~~~~~~~~")
-    folder = swiftPreloadFolder()
     print(folder)
     if folder is not None:
         folder = expanduser(folder)
@@ -335,7 +326,7 @@ def preload_autocomplete():
         onlyfiles = [f for f in onlyfiles if not f.endswith(".cached")]
         current_id = 123456
         start_time = time.time()
-        print(onlyfiles)
+        #print(onlyfiles)
         for file in onlyfiles:
             cached_file = file + ".cached"
             if cached_file in cached_files:
@@ -367,6 +358,7 @@ def preload_autocomplete():
     pass
 
 # sublime.set_timeout(lambda: preload_autocomplete(), 500)
+wait_for_settings_and_do('autocomplete.sublime-settings', 'preload_swift', lambda folder: preload_autocomplete(folder))
 
 class ViewDeactivatedListener(sublime_plugin.EventListener):
     def on_deactivated(self, view):
