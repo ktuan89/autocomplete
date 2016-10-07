@@ -43,7 +43,8 @@ def sublime_params_snippet_from_str(params_str, is_func):
                 fill_str = fill_str + "${0}".format(current_index)
             else:
                 if is_first and is_func:
-                    fill_str = fill_str + "${{{0}:{1}}}".format(current_index, param_var)
+                    fill_str = fill_str + "${{{0}:{1}}}${2}".format(current_index, param_var, current_index + 1)
+                    current_index = current_index + 1
                 else:
                     fill_str = fill_str + "{1}: ${{{0}:{2}}}".format(current_index, param_name, param_var)
 
@@ -163,6 +164,56 @@ def construct_links(str):
     #print(class_to_func)
     return class_to_func
 
+def construct_enum_suggestions(str):
+    enum_cases_rules = [
+        StringMatchExpectation("enum ").loop(),
+        SpacesExpectation(),
+        WordExpectation().save(),
+        StringMatchExpectation("{"),
+        BackwardExpectation(1),
+        MatchBracketExpectation("{", "}").nested(),
+        StringMatchExpectation("case ").loop(),
+        SpacesExpectation(),
+        WordExpectation().save()
+    ]
+
+    enum_cases = scan_text(str, enum_cases_rules)
+    enum_to_cases = {}
+    for enum_case in enum_cases:
+        if len(enum_case) == 2:
+            (enum, case) = enum_case
+            if enum in enum_to_cases:
+                enum_to_cases[enum].append(case)
+            else:
+                enum_to_cases[enum] = [case]
+    return enum_to_cases
+
+def completion_for_cases(cases):
+    return "\ncase .".join(map(lambda x: x + ":", cases))
+
+def swift_autocompletion_case_enum(view, prefix, location):
+    results = []
+    for view_id, suggestions_per_view in suggestions.items():
+        if ENUM_KEY in suggestions_per_view:
+            for enum, cases in suggestions_per_view[ENUM_KEY].items():
+                results.append((enum, completion_for_cases(cases)))
+    for view_id, suggestions_per_view in suggestions.items():
+        if ENUM_KEY in suggestions_per_view:
+            for enum, cases in suggestions_per_view[ENUM_KEY].items():
+                for case in cases:
+                    results.append((case, case))
+    return filter_duplicate(results)
+
+def swift_autocompletion_enum(view, prefix, location):
+    results = []
+    for view_id, suggestions_per_view in suggestions.items():
+        if ENUM_KEY in suggestions_per_view:
+            for enum, cases in suggestions_per_view[ENUM_KEY].items():
+                for case in cases:
+                    results.append((enum + "." + case, case))
+    return results
+
+
 def filter_suggestion_for_prefix(suggestions, prefix):
     results = []
     for suggestion in suggestions:
@@ -193,6 +244,7 @@ class InsertBracketCommand(sublime_plugin.TextCommand):
             self.view.sel().clear()
             self.view.sel().add(sublime.Region(cursor, cursor))
 
+ENUM_KEY = 'enum'
 METHOD_KEY = 'method'
 PARAM_KEY = 'param'
 
@@ -217,7 +269,7 @@ def swift_autocompletion(view, prefix, locations):
     if len(results) == 0:
         view.run_command("insert_bracket")
         return results
-    print(results)
+    #print(results)
     return results
 
 previous_guess = {}
@@ -233,7 +285,7 @@ def try_to_guess_type(variable, str):
     ]
 
     types = scan_text(str, type_rule)
-    print(types)
+    #print(types)
     if len(types) > 0:
         type = types[len(types) - 1][0]
         previous_guess[variable] = type
@@ -265,13 +317,14 @@ def swift_autocompletion_call(view, prefix, locations):
     word_type = try_to_guess_type(word, str)
 
     if word_type is not None:
-        #print("Guess type = ", word_type)
-        #print("suggestions = ", suggestions)
+        print("Guess type = ", word_type)
         for view_id, suggestions_per_view in suggestions.items():
             if METHOD_KEY in suggestions_per_view:
                 method_suggestions = suggestions_per_view[METHOD_KEY]
+                # print("Method suggestions = ", method_suggestions)
                 if word_type in method_suggestions:
                     funcs = method_suggestions[word_type]
+                    # print("Has ", word_type, " get ", funcs)
                     for func in funcs:
                         results.append((func + "\t" + "+", func))
     return filter_duplicate(results)
@@ -368,15 +421,19 @@ class ViewDeactivatedListener(sublime_plugin.EventListener):
         str = view.substr(sublime.Region(0, view.size()))
         str = comment_and_empty_line_remove(str)
         method_suggestions = None
+        enum_suggestions = None
         if len(str) >= 200000:
             t = time.time()
             str = indentation_heuristic(str)
             print("Heuristic time = ", time.time() - t)
         else:
             method_suggestions = construct_links(str)
-        print(suggestions, " ", view.id())
+            enum_suggestions = construct_enum_suggestions(str)
+        #print(suggestions, " ", view.id())
         suggestions[view.id()] = { PARAM_KEY: construct_suggestions_swift(str) }
         if method_suggestions is not None:
             suggestions[view.id()][METHOD_KEY] = method_suggestions
+        if enum_suggestions is not None:
+            suggestions[view.id()][ENUM_KEY] = enum_suggestions
         # print(suggestions[view.id()])
         print("Parse time = ", time.time() - start_time)
