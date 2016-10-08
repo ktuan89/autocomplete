@@ -3,6 +3,8 @@ import sublime, sublime_plugin
 from .text_processing import *
 from .utilities import *
 
+from .objc import construct_func_objc
+
 import re
 import threading
 import time
@@ -260,6 +262,7 @@ def swift_autocompletion(view, prefix, locations):
     #print(suggestions)
     for view_id, suggestions_per_view in suggestions.items():
         if PARAM_KEY in suggestions_per_view:
+            print(view_id, " ", suggestions_per_view[PARAM_KEY])
             results += filter_suggestion_for_prefix(suggestions_per_view[PARAM_KEY], word)
 
     results = filter_duplicate(results)
@@ -374,6 +377,11 @@ def preload_autocomplete(folder):
     print(folder)
     if folder is not None:
         folder = expanduser(folder)
+
+        onlyfolders = [f for f in listdir(folder) if not isfile(join(folder, f)) and re.match(r'[a-z_A-Z0-9]+', f)]
+        for subfolder in onlyfolders:
+            preload_autocomplete(join(folder, subfolder))
+
         onlyfiles = [f for f in listdir(folder) if isfile(join(folder, f)) and re.match(r'[a-z_A-Z0-9]+(\.[a-z_A-Z0-9]+)*', f)]
         cached_files = set([f for f in onlyfiles if f.endswith(".cached")])
         onlyfiles = [f for f in onlyfiles if not f.endswith(".cached")]
@@ -386,6 +394,7 @@ def preload_autocomplete(folder):
                 actual_path = join(folder, cached_file)
                 thefile = open(actual_path, 'rb')
                 this_suggestions = pickle.load(thefile)
+                print(cached_file," ", this_suggestions)
                 thefile.close()
                 suggestions[current_id] = this_suggestions
                 current_id = current_id + 1
@@ -393,10 +402,8 @@ def preload_autocomplete(folder):
                 actual_path = join(folder, file)
                 with codecs.open(actual_path, 'r', encoding='utf-8') as f:
                     content = f.read()
-                    content = comment_and_empty_line_remove(content)
                     this_suggestions = {
-                        PARAM_KEY: construct_suggestions_swift(content),
-                        METHOD_KEY: construct_links(content)
+                        PARAM_KEY: construct_func_objc(content),
                     }
 
                     cached_path = join(folder, cached_file)
@@ -411,7 +418,8 @@ def preload_autocomplete(folder):
     pass
 
 # sublime.set_timeout(lambda: preload_autocomplete(), 500)
-wait_for_settings_and_do('autocomplete.sublime-settings', 'preload_swift', lambda folder: preload_autocomplete(folder))
+# wait_for_settings_and_do('autocomplete.sublime-settings', 'preload_swift', lambda folder: preload_autocomplete(folder))
+wait_for_settings_and_do('autocomplete.sublime-settings', 'preload_objc', lambda folder: preload_autocomplete(folder))
 
 class ViewDeactivatedListener(sublime_plugin.EventListener):
     def on_deactivated(self, view):

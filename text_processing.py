@@ -193,6 +193,24 @@ class CapitalizedWordExpectation(ExpectationBase):
             return Segment.notFound(start)
         return Segment(start, i)
 
+class SpacePrefixedWordExpectation(ExpectationBase):
+    def scan(self, str, segment):
+        start = segment.start
+        i = start
+        while i < len(str) and str[i] == ' ':
+            i = i + 1
+        if i == len(str):
+            return Segment.notFound(i)
+        start = i
+        while i < len(str):
+            condition = str[i].isalnum() or str[i] == "_"
+            if not condition:
+                break
+            i = i + 1
+        if i == start:
+            return Segment.notFound(start)
+        return Segment(start, i)
+
 def scan_text_recursive(str, segment, expectations, results, current_matches):
     if len(expectations) == 0:
         results.append(current_matches)
@@ -209,7 +227,7 @@ def scan_text_recursive(str, segment, expectations, results, current_matches):
         res = expectation.scan(str, Segment(start, end))
         if res.invalid():
             if is_looping:
-                start = res.end
+                start = max(res.end, start + 1)
             else:
                 return res.end
         else:
