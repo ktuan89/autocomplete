@@ -427,21 +427,33 @@ class ViewDeactivatedListener(sublime_plugin.EventListener):
         global suggestions
         start_time = time.time()
         str = view.substr(sublime.Region(0, view.size()))
+        view_id = view.id()
+
+        sublime.set_timeout_async(lambda: self.parse_str_async(str,
+            lambda param_suggestions, method_suggestions, enum_suggestions: self.parse_completion(view_id, param_suggestions, method_suggestions, enum_suggestions)), 0)
+
+        # print(suggestions[view.id()])
+        print("Parse time = ", time.time() - start_time)
+
+    def parse_str_async(self, str, completion):
+        t = time.time()
         str = comment_and_empty_line_remove(str)
         method_suggestions = None
         enum_suggestions = None
         if len(str) >= 200000:
-            t = time.time()
             str = indentation_heuristic(str)
             print("Heuristic time = ", time.time() - t)
         else:
             method_suggestions = construct_links(str)
             enum_suggestions = construct_enum_suggestions(str)
         #print(suggestions, " ", view.id())
-        suggestions[view.id()] = { PARAM_KEY: construct_suggestions_swift(str) }
+        param_suggestions = construct_suggestions_swift(str)
+        print("Total parse time = ", time.time() - t)
+        sublime.set_timeout(lambda: completion(param_suggestions, method_suggestions, enum_suggestions), 0)
+
+    def parse_completion(self, view_id, param_suggestions, method_suggestions, enum_suggestions):
+        suggestions[view_id] = { PARAM_KEY: param_suggestions }
         if method_suggestions is not None:
-            suggestions[view.id()][METHOD_KEY] = method_suggestions
+            suggestions[view_id][METHOD_KEY] = method_suggestions
         if enum_suggestions is not None:
-            suggestions[view.id()][ENUM_KEY] = enum_suggestions
-        # print(suggestions[view.id()])
-        print("Parse time = ", time.time() - start_time)
+            suggestions[view_id][ENUM_KEY] = enum_suggestions
