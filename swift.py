@@ -335,17 +335,6 @@ def swift_autocompletion_call(view, prefix, locations):
                         results.append((func + "\t" + "+", func))
     return filter_duplicate(results)
 
-def comment_and_empty_line_remove(content):
-    arr = content.split("\n")
-    results = []
-    for s in arr:
-        strips = s.strip()
-        if strips.startswith("//") or strips == "":
-            pass
-        else:
-            results.append(s)
-    return "\n".join(results)
-
 def indentation_heuristic(content):
     indentation = 4
     num_indentation = 1

@@ -10,3 +10,14 @@ def wait_for_settings_and_do(settings, key, func):
             print("Success to load ", settings)
             func(loaded_settings)
     wait_for_settings_and_do_recursive(settings, key, func, 200)
+
+def comment_and_empty_line_remove(content):
+    arr = content.split("\n")
+    results = []
+    for s in arr:
+        strips = s.strip()
+        if strips.startswith("//") or strips == "":
+            pass
+        else:
+            results.append(s)
+    return "\n".join(results)
