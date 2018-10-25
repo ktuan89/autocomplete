@@ -1,4 +1,4 @@
 {
-    "preload_swift": "~/swift_headers",
-    "preload_objc": "~/objc_headers",
+    // "preload_swift": "~/swift_headers",
+    // "preload_objc": "~/objc_headers",
 }

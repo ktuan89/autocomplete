@@ -422,7 +422,7 @@ def preload_autocomplete(folder):
 
 # sublime.set_timeout(lambda: preload_autocomplete(), 500)
 # wait_for_settings_and_do('autocomplete.sublime-settings', 'preload_swift', lambda folder: preload_autocomplete(folder))
-wait_for_settings_and_do('autocomplete.sublime-settings', 'preload_objc', lambda folder: preload_autocomplete(folder))
+# wait_for_settings_and_do('autocomplete.sublime-settings', 'preload_objc', lambda folder: preload_autocomplete(folder))
 
 class ViewDeactivatedListener(sublime_plugin.EventListener):
     def on_deactivated(self, view):
