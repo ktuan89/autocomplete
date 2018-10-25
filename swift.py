@@ -1,7 +1,7 @@
 import sublime, sublime_plugin
 
 from .text_processing import *
-from .utilities import *
+from .common.utils import *
 
 from .objc import construct_func_objc
 
@@ -285,7 +285,7 @@ def try_to_guess_type(variable, str):
     type_rule = [
         StringMatchExpectation(variable).loop(),
         SpacesExpectation(),
-        OneOfStringsMatchAtBeginningExpectation(["=", ":"]),
+        OneOfStringsMatchReturnBeginningIfFailsExpectation(["=", ":"]),
         SpacesExpectation(),
         CapitalizedWordExpectation().save()
     ]

@@ -6,6 +6,7 @@ from .swift import swift_autocompletion
 from .swift import swift_autocompletion_call
 from .swift import swift_autocompletion_enum
 from .swift import swift_autocompletion_case_enum
+from .reactjs import reactjs_autocompletion
 
 class KtAutoComplete(sublime_plugin.EventListener):
     def on_query_completions(self, view, prefix, locations):
@@ -19,4 +20,5 @@ class KtAutoComplete(sublime_plugin.EventListener):
         #     return (swift_autocompletion(view, prefix, locations), sublime.INHIBIT_WORD_COMPLETIONS)
         # if view.substr(locations[0] - 1) == "." and prefix == "":
         #     return (swift_autocompletion_call(view, prefix, locations), sublime.INHIBIT_WORD_COMPLETIONS)
-        return (all_views_autocompletion(view, prefix, locations), sublime.INHIBIT_WORD_COMPLETIONS)
+        return (all_views_autocompletion(view, prefix, locations) +
+            reactjs_autocompletion(view, prefix, locations), sublime.INHIBIT_WORD_COMPLETIONS)

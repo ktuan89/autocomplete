@@ -38,11 +38,20 @@ class ExpectationBase:
         pass
 
 class BackwardExpectation(ExpectationBase):
+    # Move back count characters to continue the search
     def __init__(self, count):
         self.count = count
 
     def scan(self, str, segment):
         return Segment(segment.start, segment.start - self.count)
+
+class BeginOfLineExpectation(ExpectationBase):
+    # Move back to the beginning of a line or the entire string
+    def scan(self, str, segment):
+        i = segment.start - 1
+        while i >= 0 and str[i] != '\n':
+            i = i - 1
+        return Segment(segment.start, i + 1)
 
 class OrExpectation(ExpectationBase):
     def __init__(self, exp1, exp2):
@@ -68,7 +77,7 @@ class OffsetExpectation(ExpectationBase):
             return Segment(res.start, res.end + self.offset)
 
 class StringMatchExpectation(ExpectationBase):
-
+    # Find the exact match, if fails, move to the end of segment
     def __init__(self, match):
         self.match = match
 
@@ -82,7 +91,7 @@ class StringMatchExpectation(ExpectationBase):
         return Segment.notFound(segment.end)
 
 class OneOfStringsMatchExpectation(ExpectationBase):
-
+    # Same as StringMatchExpectation but for an array of matches
     def __init__(self, matches):
         self.matches = matches
 
@@ -96,8 +105,8 @@ class OneOfStringsMatchExpectation(ExpectationBase):
 
         return Segment.notFound(segment.end)
 
-class OneOfStringsMatchAtBeginningExpectation(ExpectationBase):
-
+class OneOfStringsMatchReturnBeginningIfFailsExpectation(ExpectationBase):
+    # Same as OneOfStringsMatchExpectation. If fails, keep the search at the beginning of a segment
     def __init__(self, matches):
         self.matches = matches
 
@@ -109,6 +118,21 @@ class OneOfStringsMatchAtBeginningExpectation(ExpectationBase):
                     if str[i : i + word_len] == word:
                         return Segment(i, i + word_len)
             break
+
+        return Segment.notFound(segment.start)
+
+class OneOfStringsMatchAtBeginningExpectation(ExpectationBase):
+    # Same as OneOfStringsMatchExpectation but matching must happen at the first char
+    def __init__(self, matches):
+        self.matches = matches
+
+    def scan(self, str, segment):
+        i = segment.start
+        for word in self.matches:
+            word_len = len(word)
+            if i + word_len <= len(str):
+                if str[i : i + word_len] == word:
+                    return Segment(i, i + word_len)
 
         return Segment.notFound(segment.start)
 

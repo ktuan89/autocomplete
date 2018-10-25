@@ -1,7 +1,7 @@
 import sublime, sublime_plugin
 
 from .text_processing import *
-from .utilities import *
+from .common.utils import *
 
 import re
 
