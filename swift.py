@@ -70,7 +70,7 @@ def construct_suggestions_swift(str):
 
     start_time = time.time()
     funcs = scan_text(str, func_rules)
-    print("Parse time func = ", time.time() - start_time)
+    # print("Parse time func = ", time.time() - start_time)
     # print(funcs)
 
     for func in funcs:
@@ -104,7 +104,7 @@ def construct_suggestions_swift(str):
 
     start_time = time.time()
     class_inits = scan_text(str, class_inits_rules)
-    print("Parse time class = ", time.time() - start_time)
+    # print("Parse time class = ", time.time() - start_time)
     # print(class_inits)
     for class_init in class_inits:
             results.append((class_init[0], class_init[1]))
@@ -120,7 +120,7 @@ def construct_suggestions_swift(str):
 
     start_time = time.time()
     structs = scan_text(str, struct_inits_rules)
-    print("Parse time = ", time.time() - start_time)
+    # print("Parse time = ", time.time() - start_time)
     # print(structs)
     for struct in structs:
         func_name = struct[0]
@@ -260,10 +260,13 @@ def swift_autocompletion(view, prefix, locations):
     #print("autocompletion ", word)
     global suggestions
     #print(suggestions)
+    total_items = 0
     for view_id, suggestions_per_view in suggestions.items():
         if PARAM_KEY in suggestions_per_view:
-            print(view_id, " ", suggestions_per_view[PARAM_KEY])
+            # print(view_id, " ", suggestions_per_view[PARAM_KEY])
+            total_items = total_items + len(suggestions_per_view[PARAM_KEY])
             results += filter_suggestion_for_prefix(suggestions_per_view[PARAM_KEY], word)
+    print("total item = ", total_items)
 
     results = filter_duplicate(results)
 
@@ -369,12 +372,12 @@ def indentation_heuristic(content):
             if regex.search(s) is not None:
                 # print("append " + str(cp) + " " + s)
                 stack.append(cp)
-    print(str(len(arr)) + " " + str(len(results)))
+    # print(str(len(arr)) + " " + str(len(results)))
     return "\n".join(results)
 
 def preload_autocomplete(folder):
     global suggestions
-    print(folder)
+    print("folder = ", folder)
     if folder is not None:
         folder = expanduser(folder)
 
@@ -394,7 +397,7 @@ def preload_autocomplete(folder):
                 actual_path = join(folder, cached_file)
                 thefile = open(actual_path, 'rb')
                 this_suggestions = pickle.load(thefile)
-                print(cached_file," ", this_suggestions)
+                # print(cached_file," ", this_suggestions)
                 thefile.close()
                 suggestions[current_id] = this_suggestions
                 current_id = current_id + 1
@@ -414,7 +417,7 @@ def preload_autocomplete(folder):
                     suggestions[current_id] = this_suggestions
                     current_id = current_id + 1
 
-        print("Init time = ", time.time() - start_time)
+        #print("Init time = ", time.time() - start_time)
     pass
 
 # sublime.set_timeout(lambda: preload_autocomplete(), 500)
@@ -423,7 +426,7 @@ wait_for_settings_and_do('autocomplete.sublime-settings', 'preload_objc', lambda
 
 class ViewDeactivatedListener(sublime_plugin.EventListener):
     def on_deactivated(self, view):
-        print("==============================")
+        # print("============================== ", view.file_name())
         global suggestions
         start_time = time.time()
         str = view.substr(sublime.Region(0, view.size()))
@@ -433,7 +436,7 @@ class ViewDeactivatedListener(sublime_plugin.EventListener):
             lambda param_suggestions, method_suggestions, enum_suggestions: self.parse_completion(view_id, param_suggestions, method_suggestions, enum_suggestions)), 0)
 
         # print(suggestions[view.id()])
-        print("Parse time = ", time.time() - start_time)
+        # print("Sync string getting time = ", time.time() - start_time)
 
     def parse_str_async(self, str, completion):
         t = time.time()
@@ -448,7 +451,7 @@ class ViewDeactivatedListener(sublime_plugin.EventListener):
             enum_suggestions = construct_enum_suggestions(str)
         #print(suggestions, " ", view.id())
         param_suggestions = construct_suggestions_swift(str)
-        print("Total parse time = ", time.time() - t)
+        # print("Total parse time = ", time.time() - t)
         sublime.set_timeout(lambda: completion(param_suggestions, method_suggestions, enum_suggestions), 0)
 
     def parse_completion(self, view_id, param_suggestions, method_suggestions, enum_suggestions):
