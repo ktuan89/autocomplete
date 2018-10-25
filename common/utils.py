@@ -9,10 +9,12 @@ def dedup_strings(strs):
             res.append(s)
     return res
 
-def get_autocompletion(view, prefix, locations, stored_suggestions):
+def get_autocompletion(view, prefix, prefix_to_remove, locations, stored_suggestions):
     results = []
     for view_id, suggestions_per_view in stored_suggestions.items():
         for suggestion in suggestions_per_view:
+            if suggestion.startswith(prefix_to_remove):
+                suggestion = suggestion[len(prefix_to_remove):]
             results.append(suggestion)
     results = dedup_strings(results)
     return [(suggestion + "\t" + ":", suggestion.replace('$', '\\$'))
