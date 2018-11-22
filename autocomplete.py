@@ -20,5 +20,6 @@ class KtAutoComplete(sublime_plugin.EventListener):
         #     return (swift_autocompletion(view, prefix, locations), sublime.INHIBIT_WORD_COMPLETIONS)
         # if view.substr(locations[0] - 1) == "." and prefix == "":
         #     return (swift_autocompletion_call(view, prefix, locations), sublime.INHIBIT_WORD_COMPLETIONS)
-        return (all_views_autocompletion(view, prefix, locations) +
+        result = (all_views_autocompletion(view, prefix, locations) +
             reactjs_autocompletion(view, prefix, locations), sublime.INHIBIT_WORD_COMPLETIONS)
+        return result

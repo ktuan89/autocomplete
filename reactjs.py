@@ -38,7 +38,12 @@ class ReactJSViewDeactivedListener(BaseViewDeactivatedListener):
             ReactJSNameExpectation().save(),
         ]
         suggestions = scan_text(str, reactjs_name_rules)
-        return [s[0] for s in suggestions]
+        dotname_rules = [
+            ReactJSNameExpectation().save().loop(),
+        ]
+        dotname_suggestions = scan_text(str, dotname_rules)
+        dotname_suggestions = [s for s in dotname_suggestions if s[0].find(".") != -1 and not s[0].startswith("this")]
+        return [s[0] for s in suggestions + dotname_suggestions]
 
     def suggestion_storage(self):
         global stored_suggestions

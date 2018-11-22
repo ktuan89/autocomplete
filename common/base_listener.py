@@ -15,6 +15,7 @@ class BaseViewDeactivatedListener(sublime_plugin.EventListener):
     def parse_str_async(self, str, completion):
         t = time.time()
         str = comment_and_empty_line_remove(str)
+        suggestions = []
         if len(str) >= 200000:
             # TODO:
             pass
@@ -24,8 +25,14 @@ class BaseViewDeactivatedListener(sublime_plugin.EventListener):
         sublime.set_timeout(lambda: completion(suggestions), 0)
 
     def parse_completion(self, view_id, suggestions):
+        stored_suggestions = []
+        suggestions_set = set()
+        for suggestion in suggestions:
+            if not suggestion in suggestions_set:
+                suggestions_set.add(suggestion)
+                stored_suggestions.append(suggestion)
         storage = self.suggestion_storage()
-        storage[view_id] = suggestions
+        storage[view_id] = stored_suggestions
 
     def get_suggestions(self, str):
         # to override
